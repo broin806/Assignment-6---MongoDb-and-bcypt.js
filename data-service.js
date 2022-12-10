@@ -162,7 +162,7 @@ exports.updateEmployee = function(employeeData){
   for (info in employeeData) { //iterate over properties in employeeData set 
     if (info == "") //set to null 
     info = null;
-}
+  }
     //invoke Employee.update() function and filter  operation by "employeeNum"
       Employee.update(employeeData, 
       {where: {employeeNum : employeeData.employeeNum}}) //filtered "employeeNum"

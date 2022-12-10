@@ -1,12 +1,12 @@
 /************************************************************************* * 
- * BTI325– Assignment 5 * I declare that this assignment is my own work in accordance with Seneca Academic Policy. 
+ * BTI325– Assignment 6 * I declare that this assignment is my own work in accordance with Seneca Academic Policy. 
  * No part * of this assignment has been copied manually or electronically from any other source * 
  * (including 3rd party web sites) or distributed to other students. * * Name: Broinson Jeyarajah 
- * Student ID: 101501229 Date:  * 2020-11-27 * Your app’s URL (from Cyclic) : https://chartreuse-green-magpie-tie.cyclic.app
+ * Student ID: 101501229 Date:  * 2020-12-11 * Your app’s URL (from Cyclic) : https://chartreuse-green-magpie-tie.cyclic.app
  * 
 *************************************************************************/
 
-//POSTGRES 
+//MongoDB (user registration & login functionalilty)
 
 //REFERENCES 
 //https://stackoverflow.com/questions/33355528/filtering-an-array-with-a-function-that-returns-a-promise
@@ -16,6 +16,8 @@
 
 
 var data_service  = require('./data-service.js')
+var dataServiceAuth = require('./data-service-auth.js');
+const clientSessions = require("client-sessions");
 var express = require("express");
 var app = express(); //express is a function
 var path = require('path'); 
@@ -24,6 +26,16 @@ var HTTP_PORT = process.env.PORT || 8080;
 var multer = require('multer'); //required module
 const bodyParser = require("body-parser"); 
 var exphbs = require('express-handlebars');
+
+
+// Setup client-sessions
+app.use(clientSessions({
+  cookieName: "session", // this is the object name that will be added to 'req'
+  secret: "This is Assignment 6", // this should be a long un-guessable string.
+  duration: 2 * 60 * 1000, // duration of the session in milliseconds (2 minutes)
+  activeDuration: 1000 * 60 // the session will be extended by this many ms each request (1 minute)
+}));
+
 
   
 app.engine('.hbs',exphbs.engine({ extname:'.hbs', defaultLayout:'main', 
@@ -43,8 +55,7 @@ equal:function(lvalue, rvalue, options){
     }
 }
 }
-}));
-
+})); 
 
 
 
@@ -90,7 +101,20 @@ app.use(function(req,res,next){
   next();
   });
 
-
+  app.use(function(req, res, next) {
+    res.locals.session = req.session;
+    next();
+    });
+  
+    function ensureLogin(req, res, next) {
+      if (!req.session.user) {
+        res.redirect("/login");
+      } else {
+        next();
+      }
+    }
+  
+  
 
 
 //HOME AND ABOUT ROUTE 
@@ -117,7 +141,7 @@ app.get("/about", (req,res)=>{
   //-----------ADDITIONAL ROUTES 
 //Part 4: Adding New Routes to query "Employees"
 //responds to employees page's get requests
-app.get("/employees", (req,res)=>{ 
+app.get("/employees",ensureLogin,  (req,res)=>{ 
 
   if(req.query.status){ //if query string is for status info
   ///employees?status=value
@@ -167,7 +191,7 @@ app.get("/employees", (req,res)=>{
   })
 
 
-  app.get("/employee/:empNum", (req, res) => {
+  app.get("/employee/:empNum",ensureLogin, (req, res) => {
 
     // initialize an empty object to store the values
     let viewData = {};
@@ -219,8 +243,9 @@ app.get("/employees", (req,res)=>{
 
 // }) 
 
+
   //responds to departments page's get requests
-  app.get("/departments", (req,res) => { 
+  app.get("/departments", ensureLogin, (req,res) => { 
     data_service.getDepartments().then((data)=>{ //Makes the call to the respective get() method to fetch data
       res.render("departments", {departments: data});//access the data from the function and send response back to client. 
       }).catch(()=>{ 
@@ -233,7 +258,7 @@ app.get("/employees", (req,res)=>{
 
 
 //responds to addEmployees get requests
-app.get("/employees/add", (req,res)=>{ 
+app.get("/employees/add",ensureLogin,  (req,res)=>{ 
   // res.render("addEmployee");  
   //res.sendFile(path.join(__dirname,"/views/addEmployee.html"));
   data_service.getDepartments()
@@ -244,7 +269,7 @@ app.get("/employees/add", (req,res)=>{
 
 
 //responds to addImages get requests
-app.get("/images/add", (req,res)=>{  
+app.get("/images/add",ensureLogin, (req,res)=>{  
   res.render("addImage");
   // res.sendFile(path.join(__dirname,"/views/addImage.html"));
 }); 
@@ -252,14 +277,14 @@ app.get("/images/add", (req,res)=>{
 
  
  //Adding the "Post" route
- app.post("/images/add", upload.single("imageFile"), function(req, res){
+ app.post("/images/add",ensureLogin, upload.single("imageFile"), function(req, res){
    res.redirect("/images") //redirects to route "/image"
  });
 
 
 
  //Adding "Get" route /images using the "fs" module
-app.get("/images", (req,res) => {
+app.get("/images",ensureLogin, (req,res) => {
   fs.readdir("./public/images/uploaded", function(err, items){ //fs.readdir method (display array of images)
    // res.json(items); 
    res.render("images", {data: items, title: "Images"}); 
@@ -268,14 +293,14 @@ app.get("/images", (req,res) => {
 
 
 //route makes a call to the (promise-driven) function from the data-service.js module
-app.post("/employees/add", function(req,res){
+app.post("/employees/add",ensureLogin, function(req,res){
  //redirects to /employees
  data_service.addEmployee(req.body)
  res.redirect('/employees');
 });
 
 
-app.post("/employee/update",(req,res)=>{ //Post route 
+app.post("/employee/update",ensureLogin,(req,res)=>{ //Post route 
   // console.log(req.body);
    data_service.updateEmployee(req.body).then(()=>{
        res.redirect("/employees");
@@ -284,7 +309,7 @@ app.post("/employee/update",(req,res)=>{ //Post route
 
 
 //responds to add departments get requests
-app.get("/departments/add", (req,res)=>{ 
+app.get("/departments/add",ensureLogin, (req,res)=>{ 
   res.render("addDepartment");  
   //res.sendFile(path.join(__dirname,"/views/addEmployee.html"));
 });
@@ -292,7 +317,7 @@ app.get("/departments/add", (req,res)=>{
 
 
 //route makes a call to the (promise-driven) function from the data-service.js module
-app.post("/departments/add", function(req,res){
+app.post("/departments/add",ensureLogin, function(req,res){
   //redirects to /departments
   data_service.addDepartment(req.body).then(()=>{
   res.redirect('/departments'); //directs to the departments 
@@ -300,7 +325,7 @@ app.post("/departments/add", function(req,res){
  });
 
 
- app.post("/department/update",(req,res)=>{ //Post route 
+ app.post("/department/update",ensureLogin,(req,res)=>{ //Post route 
   // console.log(req.body);
    data_service.updateDepartment(req.body).then(()=>{
        res.redirect("/departments");
@@ -308,7 +333,7 @@ app.post("/departments/add", function(req,res){
 }); 
 
 
-app.get("/department/:departmentId", (req, res) =>{
+app.get("/department/:departmentId",ensureLogin, (req, res) =>{
   data_service.getDepartmentsById(req.params.departmentId) //parameter value
   //render a department view and pass data from promise
   .then((data) => {res.render("department", { department: data })})
@@ -319,7 +344,7 @@ app.get("/department/:departmentId", (req, res) =>{
 
 
 
-app.get('/employees/delete/:empNum', (req, res) => {
+app.get('/employees/delete/:empNum',ensureLogin, (req, res) => {
   //invoke deleteEmployeeByNum(empNum) data-service method.
   data_service.deleteEmployeeByNum(req.params.empNum)
 
@@ -328,6 +353,46 @@ app.get('/employees/delete/:empNum', (req, res) => {
 })
 
 
+app.get("/login", function(req, res) {//login route 
+  res.render('login');  
+});
+
+
+app.get("/register", function(req, res) {//register route 
+  res.render('register'); 
+}); 
+
+app.post("/register", function(req, res) { //POST register route
+  dataServiceAuth.registerUser(req.body)
+  .then(() => res.render('register', { successMessage: "User created"}))
+  .catch((err) => res.render('register', { errorMesssag: err, userName: req.body.userName }));
+});
+
+// post for /login
+app.post("/login", function(req, res) {
+  req.body.userAgent = req.get('User-Agent');
+
+  dataServiceAuth.checkUser(req.body).then(function(user) { 
+      req.session.user = {
+          userName: user.userName,
+          email: user.email,
+          loginHistory: user.loginHistory
+      }
+
+      res.redirect('/employees');
+  }) //ERROR message
+      .catch((err) => res.render('login', { errorMesssage: err, userName: req.body.userName }));
+  });
+
+
+app.get("/logout", function(req, res) { //logout route
+  req.session.reset(); 
+  res.redirect('/');
+});
+
+app.get("/userHistory", ensureLogin, function (req, res) {
+  res.render('userHistory'); //userHistory route
+}); 
 
 
 
@@ -346,14 +411,11 @@ app.use((req,res)=>{ //404 error message
 //setup http server to listen on HTTP_PORT
 
 
-
-data_service.initialize().then(()=>{ //call app.listen() and the initialize function is successful. 
-app.listen(HTTP_PORT, onHttpStart); //listen on HTTP_PORT 
-
-}).catch(()=>{// display the catch function as initialize method invoked reject method
-  console.log("Cannot open files!");
-}) 
-
-
-
+data_service.initialize()
+.then(dataServiceAuth.initialize)
+.then(function(){app.listen(HTTP_PORT, function(){
+console.log("app listening on: " + HTTP_PORT)});
+}).catch(function(err){ 
+  console.log("unable to start server: " + err);
+}); 
 
